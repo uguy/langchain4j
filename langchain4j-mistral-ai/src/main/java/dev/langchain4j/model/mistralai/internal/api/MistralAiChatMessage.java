@@ -2,12 +2,16 @@ package dev.langchain4j.model.mistralai.internal.api;
 
 import static com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies.SnakeCaseStrategy;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
+import dev.langchain4j.model.mistralai.internal.api.MistralAiChatMessageContent.TextContent;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.StringJoiner;
@@ -19,14 +23,17 @@ import java.util.StringJoiner;
 public class MistralAiChatMessage {
 
     private MistralAiRole role;
-    private String content;
+
+    @JsonProperty("content")
+    private List<MistralAiChatMessageContent> contents;
+
     private String name;
     private List<MistralAiToolCall> toolCalls;
     private String toolCallId;
 
     private MistralAiChatMessage(MistralAiChatMessageBuilder builder) {
         this.role = builder.role;
-        this.content = builder.content;
+        this.contents = builder.contents;
         this.name = builder.name;
         this.toolCalls = builder.toolCalls;
         this.toolCallId = builder.toolCallId;
@@ -36,8 +43,16 @@ public class MistralAiChatMessage {
         return this.role;
     }
 
+    @JsonIgnore
+    @Deprecated
+    /** User contents field instead */
     public String getContent() {
-        return this.content;
+        // TODO: implement this.contents.stream().findFirst()
+        return null;
+    }
+
+    public List<MistralAiChatMessageContent> getContents() {
+        return this.contents;
     }
 
     public String getName() {
@@ -56,7 +71,7 @@ public class MistralAiChatMessage {
     public int hashCode() {
         int hash = 7;
         hash = 97 * hash + Objects.hashCode(this.role);
-        hash = 97 * hash + Objects.hashCode(this.content);
+        hash = 97 * hash + Objects.hashCode(this.contents);
         hash = 97 * hash + Objects.hashCode(this.name);
         hash = 97 * hash + Objects.hashCode(this.toolCallId);
         hash = 97 * hash + Objects.hashCode(this.toolCalls);
@@ -72,7 +87,7 @@ public class MistralAiChatMessage {
             return false;
         }
         final MistralAiChatMessage other = (MistralAiChatMessage) obj;
-        return Objects.equals(this.content, other.content)
+        return Objects.equals(this.contents, other.contents)
                 && Objects.equals(this.name, other.name)
                 && this.role == other.role
                 && Objects.equals(this.toolCallId, other.toolCallId)
@@ -83,7 +98,7 @@ public class MistralAiChatMessage {
     public String toString() {
         return new StringJoiner(", ", "MistralAiChatMessage [", "]")
                 .add("role=" + this.getRole())
-                .add("content=" + this.getContent())
+                .add("contents=" + this.getContents())
                 .add("name=" + this.getName())
                 .add("toolCallId=" + this.getToolCallId())
                 .add("toolCalls=" + this.getToolCalls())
@@ -100,7 +115,7 @@ public class MistralAiChatMessage {
     public static class MistralAiChatMessageBuilder {
 
         private MistralAiRole role;
-        private String content;
+        private List<MistralAiChatMessageContent> contents;
         private String name;
         private String toolCallId;
         private List<MistralAiToolCall> toolCalls;
@@ -119,7 +134,20 @@ public class MistralAiChatMessage {
          * @return {@code this}.
          */
         public MistralAiChatMessageBuilder content(String content) {
-            this.content = content;
+            if (content != null) {
+                if (this.contents == null) {
+                    this.contents = new ArrayList<>();
+                }
+                this.contents.add(TextContent.from(content));
+            }
+            return this;
+        }
+
+        /**
+         * @return {@code this}.
+         */
+        public MistralAiChatMessageBuilder content(List<MistralAiChatMessageContent> contents) {
+            this.contents = contents;
             return this;
         }
 

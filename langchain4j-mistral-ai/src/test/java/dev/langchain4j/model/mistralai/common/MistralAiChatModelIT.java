@@ -1,18 +1,17 @@
 package dev.langchain4j.model.mistralai.common;
 
+import static dev.langchain4j.model.mistralai.MistralAiChatModelName.PIXTRAL;
+
 import dev.langchain4j.model.chat.ChatLanguageModel;
 import dev.langchain4j.model.chat.common.AbstractChatModelIT;
 import dev.langchain4j.model.mistralai.MistralAiChatModel;
-
 import java.util.List;
-
-import static dev.langchain4j.model.mistralai.MistralAiChatModelName.OPEN_MIXTRAL_8X22B;
 
 class MistralAiChatModelIT extends AbstractChatModelIT {
 
     static final ChatLanguageModel MISTRAL_CHAT_MODEL = MistralAiChatModel.builder()
             .apiKey(System.getenv("MISTRAL_AI_API_KEY"))
-            .modelName(OPEN_MIXTRAL_8X22B)
+            .modelName(PIXTRAL)
             .temperature(0.0)
             .logRequests(true)
             .logResponses(true)
@@ -20,9 +19,7 @@ class MistralAiChatModelIT extends AbstractChatModelIT {
 
     @Override
     protected List<ChatLanguageModel> models() {
-        return List.of(
-                MISTRAL_CHAT_MODEL
-        );
+        return List.of(MISTRAL_CHAT_MODEL);
     }
 
     @Override
@@ -59,15 +56,15 @@ class MistralAiChatModelIT extends AbstractChatModelIT {
         return false; // TODO implement
     }
 
-    @Override
-    protected boolean supportsSingleImageInputAsBase64EncodedString() {
-        return false; // TODO implement
-    }
-
-    @Override
-    protected boolean supportsSingleImageInputAsPublicURL() {
-        return false; // TODO implement
-    }
+    //    @Override
+    //    protected boolean supportsSingleImageInputAsBase64EncodedString() {
+    //        return true; // TODO implement
+    //    }
+    //
+    //    @Override
+    //    protected boolean supportsSingleImageInputAsPublicURL() {
+    //        return true; // TODO implement
+    //    }
 
     @Override
     protected boolean assertResponseId() {

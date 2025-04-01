@@ -1,15 +1,33 @@
 package dev.langchain4j.model.mistralai.internal.mapper;
 
+import static dev.langchain4j.internal.Exceptions.illegalArgument;
+import static dev.langchain4j.internal.Utils.isNullOrBlank;
+import static dev.langchain4j.internal.Utils.isNullOrEmpty;
+import static dev.langchain4j.model.chat.request.json.JsonSchemaElementHelper.toMap;
+import static dev.langchain4j.model.mistralai.internal.api.MistralAiChatMessageContent.DocumentUrlContent;
+import static dev.langchain4j.model.mistralai.internal.api.MistralAiChatMessageContent.ImageUrlContent;
+import static dev.langchain4j.model.mistralai.internal.api.MistralAiChatMessageContent.ReferenceContent;
+import static dev.langchain4j.model.output.FinishReason.CONTENT_FILTER;
+import static dev.langchain4j.model.output.FinishReason.LENGTH;
+import static dev.langchain4j.model.output.FinishReason.STOP;
+import static dev.langchain4j.model.output.FinishReason.TOOL_EXECUTION;
+import static java.util.stream.Collectors.toList;
+
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
+import dev.langchain4j.data.image.Image;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.Content;
+import dev.langchain4j.data.message.ImageContent;
 import dev.langchain4j.data.message.SystemMessage;
+import dev.langchain4j.data.message.TextContent;
 import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
 import dev.langchain4j.model.mistralai.internal.api.MistralAiChatCompletionResponse;
 import dev.langchain4j.model.mistralai.internal.api.MistralAiChatMessage;
+import dev.langchain4j.model.mistralai.internal.api.MistralAiChatMessageContent;
 import dev.langchain4j.model.mistralai.internal.api.MistralAiFunction;
 import dev.langchain4j.model.mistralai.internal.api.MistralAiFunctionCall;
 import dev.langchain4j.model.mistralai.internal.api.MistralAiParameters;
@@ -22,24 +40,14 @@ import dev.langchain4j.model.mistralai.internal.api.MistralAiToolType;
 import dev.langchain4j.model.mistralai.internal.api.MistralAiUsage;
 import dev.langchain4j.model.output.FinishReason;
 import dev.langchain4j.model.output.TokenUsage;
-
 import java.util.List;
-
-import static dev.langchain4j.internal.Utils.isNullOrBlank;
-import static dev.langchain4j.internal.Utils.isNullOrEmpty;
-import static dev.langchain4j.model.chat.request.json.JsonSchemaElementHelper.toMap;
-import static dev.langchain4j.model.output.FinishReason.CONTENT_FILTER;
-import static dev.langchain4j.model.output.FinishReason.LENGTH;
-import static dev.langchain4j.model.output.FinishReason.STOP;
-import static dev.langchain4j.model.output.FinishReason.TOOL_EXECUTION;
-import static java.util.stream.Collectors.toList;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 public class MistralAiMapper {
 
     public static List<MistralAiChatMessage> toMistralAiMessages(List<ChatMessage> messages) {
-        return messages.stream()
-                .map(MistralAiMapper::toMistralAiMessage)
-                .collect(toList());
+        return messages.stream().map(MistralAiMapper::toMistralAiMessage).collect(toList());
     }
 
     static MistralAiChatMessage toMistralAiMessage(ChatMessage message) {
@@ -67,7 +75,7 @@ public class MistralAiMapper {
             if (isNullOrBlank(aiMessage.text())) {
                 return MistralAiChatMessage.builder()
                         .role(MistralAiRole.ASSISTANT)
-                        .content(null)
+                        .content((String) null)
                         .toolCalls(toolCalls)
                         .build();
             }
@@ -80,10 +88,21 @@ public class MistralAiMapper {
         }
 
         if (message instanceof UserMessage userMessage) {
-            return MistralAiChatMessage.builder()
-                    .role(MistralAiRole.USER)
-                    .content(userMessage.singleText()) // MistralAI support Text Content only as String
-                    .build();
+
+            if (userMessage.hasSingleText()) {
+                return MistralAiChatMessage.builder()
+                        .role(MistralAiRole.USER)
+                        .content(userMessage.singleText())
+                        .build();
+            } else {
+                return MistralAiChatMessage.builder()
+                        .role(MistralAiRole.USER)
+                        .content(userMessage.contents().stream()
+                                .map(MistralAiMapper::toMistralAiContent)
+                                .toList())
+                        .name(userMessage.name())
+                        .build();
+            }
         }
 
         if (message instanceof ToolExecutionResultMessage) {
@@ -96,6 +115,28 @@ public class MistralAiMapper {
         }
 
         throw new IllegalArgumentException("Unknown message type: " + message.type());
+    }
+
+    private static MistralAiChatMessageContent toMistralAiContent(Content content) {
+        if (content instanceof TextContent textContent) {
+            return toMistralAiContent(textContent);
+        } else if (content instanceof ImageContent imageContent) {
+            return toMistralAiContent(imageContent);
+        } else {
+            throw illegalArgument("Unsupported content type: " + content);
+        }
+    }
+
+    private static MistralAiChatMessageContent.TextContent toMistralAiContent(TextContent content) {
+        return MistralAiChatMessageContent.TextContent.from(content.text());
+    }
+
+    private static MistralAiChatMessageContent.ImageUrlContent toMistralAiContent(ImageContent content) {
+        final Image image = content.image();
+        if (image.base64Data() == null) {
+            return ImageUrlContent.from(image.url().toString());
+        }
+        return ImageUrlContent.from(image.mimeType(), image.base64Data());
     }
 
     static MistralAiToolCall toMistralAiToolCall(ToolExecutionRequest toolExecutionRequest) {
@@ -115,8 +156,7 @@ public class MistralAiMapper {
         return new TokenUsage(
                 mistralAiUsage.getPromptTokens(),
                 mistralAiUsage.getCompletionTokens(),
-                mistralAiUsage.getTotalTokens()
-        );
+                mistralAiUsage.getTotalTokens());
     }
 
     public static FinishReason finishReasonFrom(String mistralAiFinishReason) {
@@ -144,7 +184,33 @@ public class MistralAiMapper {
         if (!isNullOrEmpty(toolCalls)) {
             return AiMessage.from(toToolExecutionRequests(toolCalls));
         }
-        return AiMessage.from(aiMistralMessage.getContent());
+
+        List<MistralAiChatMessageContent> contents = aiMistralMessage.getContents();
+        if (contents != null && !contents.isEmpty()) {
+
+            String text = contents.stream()
+                    .map(content -> {
+                        if (content instanceof MistralAiChatMessageContent.TextContent textContent) {
+                            return textContent.getText();
+                        }
+                        if (content instanceof DocumentUrlContent documentUrlContent) {
+                            return documentUrlContent.getDocumentUrl();
+                        }
+                        if (content instanceof ReferenceContent referenceContent) {
+                            return referenceContent.getReferenceIds().stream()
+                                    .map(String::valueOf)
+                                    .collect(Collectors.joining(","));
+                        }
+                        if (content instanceof ImageUrlContent imageUrlContent) {
+                            return imageUrlContent.getImageUrl();
+                        }
+                        return null;
+                    })
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.joining(","));
+            return AiMessage.from(text);
+        }
+        return AiMessage.from();
     }
 
     public static List<ToolExecutionRequest> toToolExecutionRequests(List<MistralAiToolCall> mistralAiToolCalls) {
@@ -163,9 +229,7 @@ public class MistralAiMapper {
     }
 
     public static List<MistralAiTool> toMistralAiTools(List<ToolSpecification> toolSpecifications) {
-        return toolSpecifications.stream()
-                .map(MistralAiMapper::toMistralAiTool)
-                .collect(toList());
+        return toolSpecifications.stream().map(MistralAiMapper::toMistralAiTool).collect(toList());
     }
 
     static MistralAiTool toMistralAiTool(ToolSpecification toolSpecification) {

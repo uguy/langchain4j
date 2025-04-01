@@ -22,11 +22,13 @@ package dev.langchain4j.model.mistralai;
  * @see <a href="https://docs.mistral.ai/guides/model-selection/">Mistral Model Selection</a>
  */
 public enum MistralAiChatModelName {
-
     OPEN_MISTRAL_7B("open-mistral-7b"), // aka mistral-tiny-2312
 
     OPEN_MIXTRAL_8x7B("open-mixtral-8x7b"), // aka mistral-small-2312
     OPEN_MIXTRAL_8X22B("open-mixtral-8x22b"), // aka open-mixtral-8x22b
+
+    PIXTRAL("pixtral-12b-2409"), // aka pixtral-12b-2409, multimodal model with vision
+    PIXTRAL_LARGE("pixtral-large-latest"), // aka pixtral-large-latest, multimodal model with vision
 
     MISTRAL_SMALL_LATEST("mistral-small-latest"), // aka mistral-small-2402
 

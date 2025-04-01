@@ -1,18 +1,17 @@
 package dev.langchain4j.model.mistralai.common;
 
+import static dev.langchain4j.model.mistralai.MistralAiChatModelName.PIXTRAL;
+
 import dev.langchain4j.model.chat.StreamingChatLanguageModel;
 import dev.langchain4j.model.chat.common.AbstractStreamingChatModelIT;
 import dev.langchain4j.model.mistralai.MistralAiStreamingChatModel;
-
 import java.util.List;
-
-import static dev.langchain4j.model.mistralai.MistralAiChatModelName.OPEN_MIXTRAL_8X22B;
 
 class MistralAiStreamingChatModelIT extends AbstractStreamingChatModelIT {
 
     static final StreamingChatLanguageModel MISTRAL_STREAMING_CHAT_MODEL = MistralAiStreamingChatModel.builder()
             .apiKey(System.getenv("MISTRAL_AI_API_KEY"))
-            .modelName(OPEN_MIXTRAL_8X22B)
+            .modelName(PIXTRAL)
             .temperature(0.0)
             .logRequests(true)
             .logResponses(true)
@@ -20,9 +19,7 @@ class MistralAiStreamingChatModelIT extends AbstractStreamingChatModelIT {
 
     @Override
     protected List<StreamingChatLanguageModel> models() {
-        return List.of(
-                MISTRAL_STREAMING_CHAT_MODEL
-        );
+        return List.of(MISTRAL_STREAMING_CHAT_MODEL);
     }
 
     @Override
@@ -57,16 +54,6 @@ class MistralAiStreamingChatModelIT extends AbstractStreamingChatModelIT {
 
     @Override
     protected boolean supportsJsonResponseFormatWithSchema() {
-        return false; // TODO implement
-    }
-
-    @Override
-    protected boolean supportsSingleImageInputAsBase64EncodedString() {
-        return false; // TODO implement
-    }
-
-    @Override
-    protected boolean supportsSingleImageInputAsPublicURL() {
         return false; // TODO implement
     }
 
