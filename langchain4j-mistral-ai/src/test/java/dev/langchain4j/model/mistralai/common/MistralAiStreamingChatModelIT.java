@@ -1,24 +1,24 @@
 package dev.langchain4j.model.mistralai.common;
 
-import static dev.langchain4j.model.mistralai.MistralAiChatModelName.PIXTRAL;
+import static dev.langchain4j.model.mistralai.MistralAiChatModelName.OPEN_MIXTRAL_8X22B;
 
-import dev.langchain4j.model.chat.StreamingChatLanguageModel;
+import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.chat.common.AbstractStreamingChatModelIT;
 import dev.langchain4j.model.mistralai.MistralAiStreamingChatModel;
 import java.util.List;
 
 class MistralAiStreamingChatModelIT extends AbstractStreamingChatModelIT {
 
-    static final StreamingChatLanguageModel MISTRAL_STREAMING_CHAT_MODEL = MistralAiStreamingChatModel.builder()
+    static final StreamingChatModel MISTRAL_STREAMING_CHAT_MODEL = MistralAiStreamingChatModel.builder()
             .apiKey(System.getenv("MISTRAL_AI_API_KEY"))
-            .modelName(PIXTRAL)
+            .modelName(OPEN_MIXTRAL_8X22B)
             .temperature(0.0)
-            .logRequests(true)
+            .logRequests(false) // images are huge in logs
             .logResponses(true)
             .build();
 
     @Override
-    protected List<StreamingChatLanguageModel> models() {
+    protected List<StreamingChatModel> models() {
         return List.of(MISTRAL_STREAMING_CHAT_MODEL);
     }
 
@@ -48,12 +48,12 @@ class MistralAiStreamingChatModelIT extends AbstractStreamingChatModelIT {
     }
 
     @Override
-    protected boolean supportsJsonResponseFormat() {
+    protected boolean supportsSingleImageInputAsBase64EncodedString() {
         return false; // TODO implement
     }
 
     @Override
-    protected boolean supportsJsonResponseFormatWithSchema() {
+    protected boolean supportsSingleImageInputAsPublicURL() {
         return false; // TODO implement
     }
 
@@ -64,6 +64,11 @@ class MistralAiStreamingChatModelIT extends AbstractStreamingChatModelIT {
 
     @Override
     protected boolean assertResponseModel() {
+        return false; // TODO implement
+    }
+
+    @Override
+    protected boolean supportsToolsAndJsonResponseFormatWithSchema() {
         return false; // TODO implement
     }
 }

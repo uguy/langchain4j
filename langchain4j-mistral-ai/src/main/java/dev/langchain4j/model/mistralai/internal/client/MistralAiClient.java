@@ -2,7 +2,14 @@ package dev.langchain4j.model.mistralai.internal.client;
 
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.model.StreamingResponseHandler;
-import dev.langchain4j.model.mistralai.internal.api.*;
+import dev.langchain4j.model.mistralai.internal.api.MistralAiChatCompletionRequest;
+import dev.langchain4j.model.mistralai.internal.api.MistralAiChatCompletionResponse;
+import dev.langchain4j.model.mistralai.internal.api.MistralAiEmbeddingRequest;
+import dev.langchain4j.model.mistralai.internal.api.MistralAiEmbeddingResponse;
+import dev.langchain4j.model.mistralai.internal.api.MistralAiFimCompletionRequest;
+import dev.langchain4j.model.mistralai.internal.api.MistralAiModelResponse;
+import dev.langchain4j.model.mistralai.internal.api.MistralAiModerationRequest;
+import dev.langchain4j.model.mistralai.internal.api.MistralAiModerationResponse;
 import dev.langchain4j.spi.ServiceHelper;
 import java.time.Duration;
 
@@ -10,13 +17,19 @@ public abstract class MistralAiClient {
 
     public abstract MistralAiChatCompletionResponse chatCompletion(MistralAiChatCompletionRequest request);
 
-    public abstract void streamingChatCompletion(MistralAiChatCompletionRequest request, StreamingResponseHandler<AiMessage> handler);
+    public abstract void streamingChatCompletion(
+            MistralAiChatCompletionRequest request, StreamingResponseHandler<AiMessage> handler);
 
     public abstract MistralAiEmbeddingResponse embedding(MistralAiEmbeddingRequest request);
 
     public abstract MistralAiModerationResponse moderation(MistralAiModerationRequest request);
 
     public abstract MistralAiModelResponse listModels();
+
+    public abstract MistralAiChatCompletionResponse fimCompletion(MistralAiFimCompletionRequest request);
+
+    public abstract void streamingFimCompletion(
+            MistralAiFimCompletionRequest request, StreamingResponseHandler<String> handler);
 
     @SuppressWarnings("rawtypes")
     public static MistralAiClient.Builder builder() {
@@ -47,7 +60,8 @@ public abstract class MistralAiClient {
 
         public B apiKey(String apiKey) {
             if (apiKey == null || apiKey.trim().isEmpty()) {
-                throw new IllegalArgumentException("MistralAI API Key must be defined. It can be generated here: https://console.mistral.ai/user/api-keys");
+                throw new IllegalArgumentException(
+                        "MistralAI API Key must be defined. It can be generated here: https://console.mistral.ai/user/api-keys");
             }
             this.apiKey = apiKey;
             return (B) this;

@@ -1,9 +1,9 @@
 package dev.langchain4j.model.mistralai.internal.mapper;
 
 import static dev.langchain4j.internal.Exceptions.illegalArgument;
+import static dev.langchain4j.internal.JsonSchemaElementUtils.toMap;
 import static dev.langchain4j.internal.Utils.isNullOrBlank;
 import static dev.langchain4j.internal.Utils.isNullOrEmpty;
-import static dev.langchain4j.model.chat.request.json.JsonSchemaElementHelper.toMap;
 import static dev.langchain4j.model.mistralai.internal.api.MistralAiChatMessageContent.DocumentUrlContent;
 import static dev.langchain4j.model.mistralai.internal.api.MistralAiChatMessageContent.ImageUrlContent;
 import static dev.langchain4j.model.mistralai.internal.api.MistralAiChatMessageContent.ReferenceContent;
@@ -24,6 +24,7 @@ import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.TextContent;
 import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.model.chat.request.ResponseFormat;
 import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
 import dev.langchain4j.model.mistralai.internal.api.MistralAiChatCompletionResponse;
 import dev.langchain4j.model.mistralai.internal.api.MistralAiChatMessage;
@@ -253,17 +254,20 @@ public class MistralAiMapper {
         }
     }
 
-    public static MistralAiResponseFormat toMistralAiResponseFormat(String responseFormat) {
+    public static MistralAiResponseFormat toMistralAiResponseFormat(
+            ResponseFormat responseFormat, ResponseFormat fallbackFormat) {
         if (responseFormat == null) {
-            return null;
+            if (fallbackFormat == null) {
+                return null;
+            }
+            responseFormat = fallbackFormat;
         }
-        switch (responseFormat) {
-            case "text":
-                return MistralAiResponseFormat.fromType(MistralAiResponseFormatType.TEXT);
-            case "json_object":
-                return MistralAiResponseFormat.fromType(MistralAiResponseFormatType.JSON_OBJECT);
-            default:
-                throw new IllegalArgumentException("Unknown response format: " + responseFormat);
-        }
+        return switch (responseFormat.type()) {
+            case TEXT -> MistralAiResponseFormat.fromType(MistralAiResponseFormatType.TEXT);
+            case JSON ->
+                responseFormat.jsonSchema() != null
+                        ? MistralAiResponseFormat.fromSchema(responseFormat.jsonSchema())
+                        : MistralAiResponseFormat.fromType(MistralAiResponseFormatType.JSON_OBJECT);
+        };
     }
 }

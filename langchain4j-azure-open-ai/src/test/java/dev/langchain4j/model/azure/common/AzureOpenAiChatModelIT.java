@@ -1,7 +1,8 @@
 package dev.langchain4j.model.azure.common;
 
 import dev.langchain4j.model.azure.AzureOpenAiChatModel;
-import dev.langchain4j.model.chat.ChatLanguageModel;
+import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.common.AbstractChatModelIT;
 import java.util.List;
 import org.junit.jupiter.api.Disabled;
@@ -16,7 +17,7 @@ class AzureOpenAiChatModelIT extends AbstractChatModelIT {
             .endpoint(System.getenv("AZURE_OPENAI_ENDPOINT"))
             .apiKey(System.getenv("AZURE_OPENAI_KEY"))
             .deploymentName("gpt-4o-mini")
-            .logRequestsAndResponses(true)
+            .logRequestsAndResponses(false) // images are huge in logs
             .build();
 
     static final AzureOpenAiChatModel AZURE_OPEN_AI_CHAT_MODEL_STRICT_SCHEMA = AzureOpenAiChatModel.builder()
@@ -24,11 +25,11 @@ class AzureOpenAiChatModelIT extends AbstractChatModelIT {
             .apiKey(System.getenv("AZURE_OPENAI_KEY"))
             .deploymentName("gpt-4o-mini")
             .strictJsonSchema(true)
-            .logRequestsAndResponses(true)
+            .logRequestsAndResponses(false) // images are huge in logs
             .build();
 
     @Override
-    protected List<ChatLanguageModel> models() {
+    protected List<ChatModel> models() {
         return List.of(AZURE_OPEN_AI_CHAT_MODEL, AZURE_OPEN_AI_CHAT_MODEL_STRICT_SCHEMA);
     }
 
@@ -36,7 +37,7 @@ class AzureOpenAiChatModelIT extends AbstractChatModelIT {
     @Disabled
     @ParameterizedTest
     @MethodSource("modelsSupportingImageInputs")
-    protected void should_accept_single_image_as_public_URL(ChatLanguageModel model) {
+    protected void should_accept_single_image_as_public_URL(ChatModel model) {
         // TODO fix
     }
 
@@ -44,7 +45,7 @@ class AzureOpenAiChatModelIT extends AbstractChatModelIT {
     @Disabled
     @ParameterizedTest
     @MethodSource("modelsSupportingImageInputs")
-    protected void should_accept_multiple_images_as_public_URLs(ChatLanguageModel model) {
+    protected void should_accept_multiple_images_as_public_URLs(ChatModel model) {
         // TODO fix
     }
 

@@ -1,24 +1,24 @@
 package dev.langchain4j.model.mistralai.common;
 
-import static dev.langchain4j.model.mistralai.MistralAiChatModelName.PIXTRAL;
+import static dev.langchain4j.model.mistralai.MistralAiChatModelName.OPEN_MIXTRAL_8X22B;
 
-import dev.langchain4j.model.chat.ChatLanguageModel;
+import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.common.AbstractChatModelIT;
 import dev.langchain4j.model.mistralai.MistralAiChatModel;
 import java.util.List;
 
 class MistralAiChatModelIT extends AbstractChatModelIT {
 
-    static final ChatLanguageModel MISTRAL_CHAT_MODEL = MistralAiChatModel.builder()
+    static final ChatModel MISTRAL_CHAT_MODEL = MistralAiChatModel.builder()
             .apiKey(System.getenv("MISTRAL_AI_API_KEY"))
-            .modelName(PIXTRAL)
+            .modelName(OPEN_MIXTRAL_8X22B)
             .temperature(0.0)
-            .logRequests(true)
+            .logRequests(false) // images are huge in logs
             .logResponses(true)
             .build();
 
     @Override
-    protected List<ChatLanguageModel> models() {
+    protected List<ChatModel> models() {
         return List.of(MISTRAL_CHAT_MODEL);
     }
 
@@ -47,24 +47,15 @@ class MistralAiChatModelIT extends AbstractChatModelIT {
         return false; // TODO implement
     }
 
-    protected boolean supportsJsonResponseFormat() {
+    @Override
+    protected boolean supportsSingleImageInputAsBase64EncodedString() {
         return false; // TODO implement
     }
 
     @Override
-    protected boolean supportsJsonResponseFormatWithSchema() {
+    protected boolean supportsSingleImageInputAsPublicURL() {
         return false; // TODO implement
     }
-
-    //    @Override
-    //    protected boolean supportsSingleImageInputAsBase64EncodedString() {
-    //        return true; // TODO implement
-    //    }
-    //
-    //    @Override
-    //    protected boolean supportsSingleImageInputAsPublicURL() {
-    //        return true; // TODO implement
-    //    }
 
     @Override
     protected boolean assertResponseId() {
@@ -73,6 +64,11 @@ class MistralAiChatModelIT extends AbstractChatModelIT {
 
     @Override
     protected boolean assertResponseModel() {
+        return false; // TODO implement
+    }
+
+    @Override
+    protected boolean supportsToolsAndJsonResponseFormatWithSchema() {
         return false; // TODO implement
     }
 }

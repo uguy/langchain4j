@@ -12,6 +12,11 @@ import java.util.Map;
 public interface McpClient extends AutoCloseable {
 
     /**
+     * Returns the unique key of this client.
+     */
+    String key();
+
+    /**
      * Obtains a list of tools from the MCP server.
      */
     List<ToolSpecification> listTools();
@@ -47,4 +52,11 @@ public interface McpClient extends AutoCloseable {
      * Render the contents of a prompt.
      */
     McpGetPromptResult getPrompt(String name, Map<String, Object> arguments);
+
+    /**
+     * Performs a health check that returns normally if the MCP server is reachable and
+     * properly responding to ping requests. If this method throws an exception,
+     * the health of this MCP client is considered degraded.
+     */
+    void checkHealth();
 }
