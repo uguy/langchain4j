@@ -23,10 +23,8 @@ import java.util.StringJoiner;
 public class MistralAiChatMessage {
 
     private MistralAiRole role;
-
     @JsonProperty("content")
     private List<MistralAiChatMessageContent> contents;
-
     private String name;
     private List<MistralAiToolCall> toolCalls;
     private String toolCallId;

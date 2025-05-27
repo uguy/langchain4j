@@ -6,4 +6,5 @@ import java.util.function.Supplier;
 /**
  * A factory for building {@link MistralAiStreamingFimModel.Builder} instances.
  */
-public interface MistralAiStreamingFimModelBuilderFactory extends Supplier<MistralAiStreamingFimModel.Builder> {}
+public interface MistralAiStreamingFimModelBuilderFactory
+        extends Supplier<MistralAiStreamingFimModel.Builder> {}

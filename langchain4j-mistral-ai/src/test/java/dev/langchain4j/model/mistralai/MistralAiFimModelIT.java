@@ -6,8 +6,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import dev.langchain4j.model.language.LanguageModel;
 import dev.langchain4j.model.output.Response;
 import dev.langchain4j.model.output.TokenUsage;
-import java.util.List;
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
 
 class MistralAiFimModelIT {
 
@@ -48,13 +49,11 @@ class MistralAiFimModelIT {
                 .modelName(MistralAiFimModelName.CODESTRAL_LATEST)
                 .logRequests(true)
                 .build();
-        String codePrompt =
-                """
+        String codePrompt = """
                             public static void main(String[] args) {
                                 // Create a function to multiply two numbers
                           """;
-        String suffix =
-                """
+        String suffix = """
                           System.out.println(result);
                         }
                       """;
@@ -107,14 +106,12 @@ class MistralAiFimModelIT {
                 .logRequests(true)
                 .build();
 
-        String codePrompt =
-                """
+        String codePrompt = """
                           public class HelloWorld {
                             public static void main(String[] args) {
                                 ChatLanguageModel model = MistralAiChatModel.withApiKey(ApiKeys.MISTRALAI_API_KEY);
                           """;
-        String suffix =
-                """
+        String suffix = """
                           System.out.println(response);
                         }
                       }

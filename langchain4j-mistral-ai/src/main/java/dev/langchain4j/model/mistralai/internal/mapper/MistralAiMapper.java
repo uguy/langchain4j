@@ -264,10 +264,9 @@ public class MistralAiMapper {
         }
         return switch (responseFormat.type()) {
             case TEXT -> MistralAiResponseFormat.fromType(MistralAiResponseFormatType.TEXT);
-            case JSON ->
-                responseFormat.jsonSchema() != null
-                        ? MistralAiResponseFormat.fromSchema(responseFormat.jsonSchema())
-                        : MistralAiResponseFormat.fromType(MistralAiResponseFormatType.JSON_OBJECT);
+            case JSON -> responseFormat.jsonSchema() != null
+                    ? MistralAiResponseFormat.fromSchema(responseFormat.jsonSchema())
+                    : MistralAiResponseFormat.fromType(MistralAiResponseFormatType.JSON_OBJECT);
         };
     }
 }

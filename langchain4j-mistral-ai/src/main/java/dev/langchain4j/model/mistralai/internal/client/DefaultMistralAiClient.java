@@ -1,29 +1,15 @@
 package dev.langchain4j.model.mistralai.internal.client;
 
 import static com.fasterxml.jackson.databind.SerializationFeature.INDENT_OUTPUT;
-import static dev.langchain4j.internal.Utils.isNotNullOrEmpty;
-import static dev.langchain4j.internal.Utils.isNullOrEmpty;
-import static dev.langchain4j.model.mistralai.internal.mapper.MistralAiMapper.finishReasonFrom;
-import static dev.langchain4j.model.mistralai.internal.mapper.MistralAiMapper.toToolExecutionRequests;
-import static dev.langchain4j.model.mistralai.internal.mapper.MistralAiMapper.tokenUsageFrom;
+import static dev.langchain4j.internal.Utils.*;
+import static dev.langchain4j.model.mistralai.internal.mapper.MistralAiMapper.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.internal.Utils;
 import dev.langchain4j.model.StreamingResponseHandler;
-import dev.langchain4j.model.mistralai.internal.api.MistralAiApi;
-import dev.langchain4j.model.mistralai.internal.api.MistralAiChatCompletionChoice;
-import dev.langchain4j.model.mistralai.internal.api.MistralAiChatCompletionRequest;
-import dev.langchain4j.model.mistralai.internal.api.MistralAiChatCompletionResponse;
-import dev.langchain4j.model.mistralai.internal.api.MistralAiEmbeddingRequest;
-import dev.langchain4j.model.mistralai.internal.api.MistralAiEmbeddingResponse;
-import dev.langchain4j.model.mistralai.internal.api.MistralAiFimCompletionRequest;
-import dev.langchain4j.model.mistralai.internal.api.MistralAiModelResponse;
-import dev.langchain4j.model.mistralai.internal.api.MistralAiModerationRequest;
-import dev.langchain4j.model.mistralai.internal.api.MistralAiModerationResponse;
-import dev.langchain4j.model.mistralai.internal.api.MistralAiToolCall;
-import dev.langchain4j.model.mistralai.internal.api.MistralAiUsage;
+import dev.langchain4j.model.mistralai.internal.api.*;
 import dev.langchain4j.model.output.FinishReason;
 import dev.langchain4j.model.output.Response;
 import dev.langchain4j.model.output.TokenUsage;
