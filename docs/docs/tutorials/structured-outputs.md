@@ -137,6 +137,7 @@ with the following subtypes:
 - `JsonReferenceSchema` - to support recursion (e.g., `Person` has a `Set<Person> children` field).
 - `JsonAnyOfSchema` - to support polymorphism (e.g., `Shape` can be either `Circle` or `Rectangle`).
 - `JsonNullSchema` - to support nullable type.
+- `JsonRawSchema` - to use your custom fully defined JSON schema.
 
 #### `JsonObjectSchema`
 
@@ -329,6 +330,33 @@ System.out.println(chatResponse.aiMessage().text()); // {"shapes":[{"radius":5},
 The `JsonAnyOfSchema` is currently supported only by OpenAI and Azure OpenAI.
 :::
 
+#### `JsonRawSchema`
+
+An example of creating a `JsonRawSchema` from an existing schema string:
+
+```java
+var rawSchema = """
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+        "city": {
+            "type": "string"
+        }
+    },
+    "required": ["city"],
+    "additionalProperties": false
+}
+""";
+
+JsonRawSchema schema = JsonRawSchema.from(rawSchema);
+```
+
+:::note
+The `JsonRawSchema` is currently supported only by Azure OpenAI, Mistral, Ollama, OpenAI and OpenAI Official.
+:::
+
+
 #### Adding Description
 
 All of the `JsonSchemaElement` subtypes, except for `JsonReferenceSchema`, have a `description` property.
@@ -361,7 +389,7 @@ interface PersonExtractor {
 ChatModel chatModel = OpenAiChatModel.builder() // see [1] below
         .apiKey(System.getenv("OPENAI_API_KEY"))
         .modelName("gpt-4o-mini")
-        .supportedCapabilities(Set.of(RESPONSE_FORMAT_JSON_SCHEMA)) // see [2] below
+        .supportedCapabilities(RESPONSE_FORMAT_JSON_SCHEMA) // see [2] below
         .strictJsonSchema(true) // see [2] below
         .logRequests(true)
         .logResponses(true)
@@ -372,14 +400,14 @@ ChatModel chatModel = AzureOpenAiChatModel.builder() // see [1] below
         .apiKey(System.getenv("AZURE_OPENAI_API_KEY"))
         .deploymentName("gpt-4o-mini")
         .strictJsonSchema(true)
-        .supportedCapabilities(Set.of(RESPONSE_FORMAT_JSON_SCHEMA)) // see [3] below
+        .supportedCapabilities(RESPONSE_FORMAT_JSON_SCHEMA) // see [3] below
         .logRequestsAndResponses(true)
         .build();
 // OR
 ChatModel chatModel = GoogleAiGeminiChatModel.builder() // see [1] below
         .apiKey(System.getenv("GOOGLE_AI_GEMINI_API_KEY"))
         .modelName("gemini-1.5-flash")
-        .responseFormat(ResponseFormat.JSON) // see [4] below
+        .supportedCapabilities(RESPONSE_FORMAT_JSON_SCHEMA) // see [4] below
         .logRequestsAndResponses(true)
         .build();
 // OR

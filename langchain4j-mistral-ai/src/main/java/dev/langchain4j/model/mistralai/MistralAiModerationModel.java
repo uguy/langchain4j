@@ -10,6 +10,7 @@ import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.http.client.HttpClientBuilder;
 import dev.langchain4j.model.mistralai.internal.api.MistralAiCategories;
 import dev.langchain4j.model.mistralai.internal.api.MistralAiModerationRequest;
 import dev.langchain4j.model.mistralai.internal.api.MistralAiModerationResponse;
@@ -18,6 +19,7 @@ import dev.langchain4j.model.mistralai.internal.client.MistralAiClient;
 import dev.langchain4j.model.moderation.Moderation;
 import dev.langchain4j.model.moderation.ModerationModel;
 import dev.langchain4j.model.output.Response;
+import org.slf4j.Logger;
 import java.time.Duration;
 import java.util.List;
 
@@ -27,25 +29,18 @@ public class MistralAiModerationModel implements ModerationModel {
     private final String modelName;
     private final Integer maxRetries;
 
-    public MistralAiModerationModel(
-            String baseUrl,
-            String apiKey,
-            Duration timeout,
-            Integer maxRetries,
-            String modelName,
-            Boolean logRequests,
-            Boolean logResponses) {
-
+    public MistralAiModerationModel(Builder builder) {
         this.client = MistralAiClient.builder()
-                .baseUrl(getOrDefault(baseUrl, "https://api.mistral.ai/v1"))
-                .apiKey(apiKey)
-                .timeout(getOrDefault(timeout, Duration.ofSeconds(60)))
-                .logRequests(getOrDefault(logRequests, false))
-                .logResponses(getOrDefault(logResponses, false))
+                .httpClientBuilder(builder.httpClientBuilder)
+                .baseUrl(getOrDefault(builder.baseUrl, "https://api.mistral.ai/v1"))
+                .apiKey(builder.apiKey)
+                .timeout(builder.timeout)
+                .logRequests(getOrDefault(builder.logRequests, false))
+                .logResponses(getOrDefault(builder.logResponses, false))
+                .logger(builder.logger)
                 .build();
-
-        this.modelName = ensureNotBlank(modelName, "modelName");
-        this.maxRetries = getOrDefault(maxRetries, 2);
+        this.modelName = ensureNotBlank(builder.modelName, "modelName");
+        this.maxRetries = getOrDefault(builder.maxRetries, 2);
     }
 
     @Override
@@ -75,7 +70,10 @@ public class MistralAiModerationModel implements ModerationModel {
 
     private Response<Moderation> moderateInternal(List<String> inputs) {
 
-        MistralAiModerationRequest request = new MistralAiModerationRequest(modelName, inputs);
+        MistralAiModerationRequest request = MistralAiModerationRequest.builder()
+                .model(modelName)
+                .input(inputs)
+                .build();
 
         MistralAiModerationResponse response = withRetryMappingExceptions(() -> client.moderation(request), maxRetries);
 
@@ -103,13 +101,25 @@ public class MistralAiModerationModel implements ModerationModel {
     }
 
     public static class Builder {
+
+        private HttpClientBuilder httpClientBuilder;
         private String baseUrl;
         private String apiKey;
         private Duration timeout;
         private Boolean logRequests;
         private Boolean logResponses;
+        private Logger logger;
         private String modelName;
         private Integer maxRetries;
+
+        /**
+         * @param httpClientBuilder the HTTP client builder to use for creating the HTTP client
+         * @return {@code this}.
+         */
+        public Builder httpClientBuilder(HttpClientBuilder httpClientBuilder) {
+            this.httpClientBuilder = httpClientBuilder;
+            return this;
+        }
 
         public Builder baseUrl(String baseUrl) {
             this.baseUrl = baseUrl;
@@ -136,6 +146,15 @@ public class MistralAiModerationModel implements ModerationModel {
             return this;
         }
 
+        /**
+         * @param logger an alternate {@link Logger} to be used instead of the default one provided by Langchain4J for logging requests and responses.
+         * @return {@code this}.
+         */
+        public Builder logger(Logger logger) {
+            this.logger = logger;
+            return this;
+        }
+
         public Builder modelName(String modelName) {
             this.modelName = modelName;
             return this;
@@ -147,8 +166,7 @@ public class MistralAiModerationModel implements ModerationModel {
         }
 
         public MistralAiModerationModel build() {
-            return new MistralAiModerationModel(
-                    baseUrl, apiKey, timeout, maxRetries, modelName, logRequests, logResponses);
+            return new MistralAiModerationModel(this);
         }
     }
 }

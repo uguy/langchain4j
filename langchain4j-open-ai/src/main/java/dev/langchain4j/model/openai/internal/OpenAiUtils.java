@@ -9,15 +9,18 @@ import dev.langchain4j.data.message.AudioContent;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.Content;
 import dev.langchain4j.data.message.ImageContent;
+import dev.langchain4j.data.message.PdfFileContent;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.TextContent;
 import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.exception.ContentFilteredException;
 import dev.langchain4j.exception.UnsupportedFeatureException;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.request.ChatRequestParameters;
 import dev.langchain4j.model.chat.request.ResponseFormat;
 import dev.langchain4j.model.chat.request.ToolChoice;
+import dev.langchain4j.model.chat.request.json.JsonRawSchema;
 import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
 import dev.langchain4j.model.chat.request.json.JsonSchema;
 import dev.langchain4j.model.chat.response.ChatResponse;
@@ -36,6 +39,7 @@ import dev.langchain4j.model.openai.internal.chat.ImageDetail;
 import dev.langchain4j.model.openai.internal.chat.ImageUrl;
 import dev.langchain4j.model.openai.internal.chat.InputAudio;
 import dev.langchain4j.model.openai.internal.chat.Message;
+import dev.langchain4j.model.openai.internal.chat.PdfFile;
 import dev.langchain4j.model.openai.internal.chat.Tool;
 import dev.langchain4j.model.openai.internal.chat.ToolCall;
 import dev.langchain4j.model.openai.internal.chat.ToolChoiceMode;
@@ -54,6 +58,8 @@ import java.util.List;
 import java.util.Map;
 
 import static dev.langchain4j.internal.Exceptions.illegalArgument;
+import static dev.langchain4j.internal.Utils.getOrDefault;
+import static dev.langchain4j.internal.Utils.isNotNullOrBlank;
 import static dev.langchain4j.internal.Utils.isNullOrBlank;
 import static dev.langchain4j.internal.Utils.isNullOrEmpty;
 import static dev.langchain4j.internal.ValidationUtils.ensureNotBlank;
@@ -68,7 +74,6 @@ import static dev.langchain4j.model.output.FinishReason.LENGTH;
 import static dev.langchain4j.model.output.FinishReason.STOP;
 import static dev.langchain4j.model.output.FinishReason.TOOL_EXECUTION;
 import static java.lang.String.format;
-import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 
 @Internal
@@ -156,6 +161,8 @@ public class OpenAiUtils {
             return toOpenAiContent((ImageContent) content);
         } else if (content instanceof AudioContent audioContent) {
             return toOpenAiContent(audioContent);
+        } else if (content instanceof PdfFileContent pdfFileContent) {
+            return toOpenAiContent(pdfFileContent);
         } else {
             throw illegalArgument("Unknown content type: " + content);
         }
@@ -183,8 +190,26 @@ public class OpenAiUtils {
                 .type(ContentType.AUDIO)
                 .inputAudio(InputAudio.builder()
                         .data(ensureNotBlank(audioContent.audio().base64Data(), "audio.base64Data"))
-                        .format(extractSubtype(ensureNotBlank(audioContent.audio().mimeType(), "audio.mimeType")))
+                        .format(extractSubtype(
+                                ensureNotBlank(audioContent.audio().mimeType(), "audio.mimeType")))
                         .build())
+                .build();
+    }
+
+    private static dev.langchain4j.model.openai.internal.chat.Content toOpenAiContent(PdfFileContent pdfFileContent) {
+        String fileData;
+        if (pdfFileContent.pdfFile().url() != null) {
+            fileData = pdfFileContent.pdfFile().url().toString();
+        } else {
+            fileData = format(
+                    "data:%s;base64,%s",
+                    pdfFileContent.pdfFile().mimeType(),
+                    pdfFileContent.pdfFile().base64Data());
+        }
+
+        return dev.langchain4j.model.openai.internal.chat.Content.builder()
+                .type(ContentType.FILE)
+                .file(PdfFile.builder().fileData(fileData).filename("pdf_file").build())
                 .build();
     }
 
@@ -254,7 +279,8 @@ public class OpenAiUtils {
             map.put("required", new ArrayList<>());
             if (strict) {
                 // When strict, additionalProperties must be false:
-                // See https://platform.openai.com/docs/guides/structured-outputs/additionalproperties-false-must-always-be-set-in-objects?api-mode=chat#additionalproperties-false-must-always-be-set-in-objects
+                // See
+                // https://platform.openai.com/docs/guides/structured-outputs/additionalproperties-false-must-always-be-set-in-objects?api-mode=chat#additionalproperties-false-must-always-be-set-in-objects
                 map.put("additionalProperties", false);
             }
             return map;
@@ -262,32 +288,45 @@ public class OpenAiUtils {
     }
 
     public static AiMessage aiMessageFrom(ChatCompletionResponse response) {
-        AssistantMessage assistantMessage = response.choices().get(0).message();
-        String text = assistantMessage.content();
+        return aiMessageFrom(response, false);
+    }
 
-        List<ToolCall> toolCalls = assistantMessage.toolCalls();
-        if (!isNullOrEmpty(toolCalls)) {
-            List<ToolExecutionRequest> toolExecutionRequests = toolCalls.stream()
-                    .filter(toolCall -> toolCall.type() == FUNCTION)
-                    .map(OpenAiUtils::toToolExecutionRequest)
-                    .collect(toList());
-            return isNullOrBlank(text)
-                    ? AiMessage.from(toolExecutionRequests)
-                    : AiMessage.from(text, toolExecutionRequests);
+    public static AiMessage aiMessageFrom(ChatCompletionResponse response, boolean returnThinking) {
+        AssistantMessage assistantMessage = response.choices().get(0).message();
+
+        String refusal = assistantMessage.refusal();
+        if (isNotNullOrBlank(refusal)) {
+            throw new ContentFilteredException(refusal);
         }
 
+        String content = assistantMessage.content();
+
+        String reasoningContent = null;
+        if (returnThinking) {
+            reasoningContent = assistantMessage.reasoningContent();
+        }
+
+        List<ToolExecutionRequest> toolExecutionRequests = getOrDefault(assistantMessage.toolCalls(), List.of())
+                .stream()
+                .filter(toolCall -> toolCall.type() == FUNCTION)
+                .map(OpenAiUtils::toToolExecutionRequest)
+                .collect(toList());
+
+        // legacy
         FunctionCall functionCall = assistantMessage.functionCall();
         if (functionCall != null) {
             ToolExecutionRequest toolExecutionRequest = ToolExecutionRequest.builder()
                     .name(functionCall.name())
                     .arguments(functionCall.arguments())
                     .build();
-            return isNullOrBlank(text)
-                    ? AiMessage.from(toolExecutionRequest)
-                    : AiMessage.from(text, singletonList(toolExecutionRequest));
+            toolExecutionRequests.add(toolExecutionRequest);
         }
 
-        return AiMessage.from(text);
+        return AiMessage.builder()
+                .text(isNullOrEmpty(content) ? null : content)
+                .thinking(isNullOrEmpty(reasoningContent) ? null : reasoningContent)
+                .toolExecutionRequests(toolExecutionRequests)
+                .build();
     }
 
     private static ToolExecutionRequest toToolExecutionRequest(ToolCall toolCall) {
@@ -348,7 +387,8 @@ public class OpenAiUtils {
         }
     }
 
-    static dev.langchain4j.model.openai.internal.chat.ResponseFormat toOpenAiResponseFormat(ResponseFormat responseFormat, Boolean strict) {
+    static dev.langchain4j.model.openai.internal.chat.ResponseFormat toOpenAiResponseFormat(
+            ResponseFormat responseFormat, Boolean strict) {
         if (responseFormat == null || responseFormat.type() == TEXT) {
             return null;
         }
@@ -359,16 +399,18 @@ public class OpenAiUtils {
                     .type(JSON_OBJECT)
                     .build();
         } else {
-            if (!(jsonSchema.rootElement() instanceof JsonObjectSchema)) {
+            if (!(jsonSchema.rootElement() instanceof JsonObjectSchema
+                    || jsonSchema.rootElement() instanceof JsonRawSchema)) {
                 throw new IllegalArgumentException(
                         "For OpenAI, the root element of the JSON Schema must be a JsonObjectSchema, but it was: "
                                 + jsonSchema.rootElement().getClass());
             }
-            dev.langchain4j.model.openai.internal.chat.JsonSchema openAiJsonSchema = dev.langchain4j.model.openai.internal.chat.JsonSchema.builder()
-                    .name(jsonSchema.name())
-                    .strict(strict)
-                    .schema(toMap(jsonSchema.rootElement(), strict))
-                    .build();
+            dev.langchain4j.model.openai.internal.chat.JsonSchema openAiJsonSchema =
+                    dev.langchain4j.model.openai.internal.chat.JsonSchema.builder()
+                            .name(jsonSchema.name())
+                            .strict(strict)
+                            .schema(toMap(jsonSchema.rootElement(), strict))
+                            .build();
             return dev.langchain4j.model.openai.internal.chat.ResponseFormat.builder()
                     .type(JSON_SCHEMA)
                     .jsonSchema(openAiJsonSchema)
@@ -435,6 +477,7 @@ public class OpenAiUtils {
                 .store(parameters.store())
                 .metadata(parameters.metadata())
                 .serviceTier(parameters.serviceTier())
-                .reasoningEffort(parameters.reasoningEffort());
+                .reasoningEffort(parameters.reasoningEffort())
+                .customParameters(parameters.customParameters());
     }
 }

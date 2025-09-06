@@ -7,6 +7,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.langchain4j.Internal;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.internal.JsonSchemaElementUtils;
 import java.util.ArrayList;
@@ -17,12 +18,12 @@ import java.util.Map;
 import software.amazon.awssdk.core.document.Document;
 import software.amazon.awssdk.core.document.internal.MapDocument;
 
+@Internal
 class AwsDocumentConverter {
 
     static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
-            .enable(INDENT_OUTPUT)
-            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-            .setSerializationInclusion(JsonInclude.Include.NON_NULL);
+            .disable(INDENT_OUTPUT)
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
     private AwsDocumentConverter() {}
 
@@ -53,6 +54,8 @@ class AwsDocumentConverter {
             Map<String, Object> innerObject = new HashMap<>();
             doc.asMap().forEach((k, v) -> innerObject.put(k, documentToObject(v)));
             return innerObject;
+        } else if (doc.isNull()) {
+            return null;
         } else {
             return doc.asString();
         }

@@ -35,6 +35,7 @@ import dev.langchain4j.model.chat.request.json.JsonArraySchema;
 import dev.langchain4j.model.chat.request.json.JsonIntegerSchema;
 import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
 import dev.langchain4j.model.chat.request.json.JsonStringSchema;
+import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.output.TokenUsage;
 import dev.langchain4j.service.tool.ToolExecution;
@@ -45,12 +46,17 @@ import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.NullSource;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
@@ -100,6 +106,8 @@ class AiServicesWithToolsIT {
 
     static class TransactionService {
 
+        final Queue<Thread> threads = new ConcurrentLinkedQueue<>();
+
         static ToolSpecification EXPECTED_SPECIFICATION = ToolSpecification.builder()
                 .name("getTransactionAmount")
                 .description("returns amount of a given transaction")
@@ -111,6 +119,7 @@ class AiServicesWithToolsIT {
 
         @Tool("returns amount of a given transaction")
         double getTransactionAmount(@P("ID of a transaction") String id) {
+            threads.add(Thread.currentThread());
             System.out.printf("called getTransactionAmount(%s)%n", id);
             switch (id) {
                 case "T001":
@@ -145,16 +154,13 @@ class AiServicesWithToolsIT {
 
         assertThat(result.content()).contains("11.1");
 
-        TokenUsage tokenUsage = result.tokenUsage();
-        assertThat(tokenUsage.inputTokenCount()).isPositive();
-        assertThat(tokenUsage.outputTokenCount()).isPositive();
-        assertThat(tokenUsage.totalTokenCount())
-                .isEqualTo(tokenUsage.inputTokenCount() + tokenUsage.outputTokenCount());
-
         assertThat(result.finishReason()).isEqualTo(STOP);
 
         verify(transactionService).getTransactionAmount("T001");
         verifyNoMoreInteractions(transactionService);
+
+        assertThat(transactionService.threads).hasSize(1);
+        assertThat(transactionService.threads.poll()).isEqualTo(Thread.currentThread());
 
         List<ChatMessage> messages = chatMemory.messages();
         assertThat(messages).hasSize(4);
@@ -175,8 +181,29 @@ class AiServicesWithToolsIT {
         assertThat(toolExecutionResultMessage.toolName()).isEqualTo("getTransactionAmount");
         assertThat(toolExecutionResultMessage.text()).isEqualTo("11.1");
 
-        assertThat(messages.get(3)).isInstanceOf(AiMessage.class);
-        assertThat(((AiMessage) messages.get(3)).text()).contains("11.1");
+        AiMessage secondAiMessage = (AiMessage) messages.get(3);
+        assertThat(secondAiMessage.text()).contains("11.1");
+        assertThat(secondAiMessage.toolExecutionRequests()).isEmpty();
+
+        assertThat(result.toolExecutions()).hasSize(1);
+        assertThat(result.toolExecutions().get(0).request()).isEqualTo(toolExecutionRequest);
+        assertThat(result.toolExecutions().get(0).result()).isEqualTo("11.1");
+
+        assertThat(result.intermediateResponses()).hasSize(1);
+        ChatResponse intermediateResponse = result.intermediateResponses().get(0);
+        assertThat(intermediateResponse.aiMessage()).isEqualTo(aiMessage);
+
+        assertThat(result.finalResponse().aiMessage()).isEqualTo(secondAiMessage);
+
+        TokenUsage tokenUsage = result.tokenUsage();
+        assertThat(tokenUsage.inputTokenCount())
+                .isEqualTo(intermediateResponse.tokenUsage().inputTokenCount()
+                        + result.finalResponse().tokenUsage().inputTokenCount());
+        assertThat(tokenUsage.outputTokenCount())
+                .isEqualTo(intermediateResponse.tokenUsage().outputTokenCount()
+                        + result.finalResponse().tokenUsage().outputTokenCount());
+        assertThat(tokenUsage.totalTokenCount())
+                .isEqualTo(tokenUsage.inputTokenCount() + tokenUsage.outputTokenCount());
 
         verify(spyChatModel)
                 .chat(ChatRequest.builder()
@@ -224,6 +251,10 @@ class AiServicesWithToolsIT {
         verify(transactionService).getTransactionAmount("T001");
         verify(transactionService).getTransactionAmount("T002");
         verifyNoMoreInteractions(transactionService);
+
+        assertThat(transactionService.threads).hasSize(2);
+        assertThat(transactionService.threads.poll()).isEqualTo(Thread.currentThread());
+        assertThat(transactionService.threads.poll()).isEqualTo(Thread.currentThread());
 
         List<ChatMessage> messages = chatMemory.messages();
         assertThat(messages).hasSize(6);
@@ -313,6 +344,10 @@ class AiServicesWithToolsIT {
         verify(transactionService).getTransactionAmount("T002");
         verifyNoMoreInteractions(transactionService);
 
+        assertThat(transactionService.threads).hasSize(2);
+        assertThat(transactionService.threads.poll()).isEqualTo(Thread.currentThread());
+        assertThat(transactionService.threads.poll()).isEqualTo(Thread.currentThread());
+
         List<ChatMessage> messages = chatMemory.messages();
         assertThat(messages).hasSize(5);
 
@@ -357,6 +392,116 @@ class AiServicesWithToolsIT {
                         .messages(messages.get(0), messages.get(1), messages.get(2), messages.get(3))
                         .toolSpecifications(EXPECTED_SPECIFICATION)
                         .build());
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @MethodSource("executors")
+    void should_execute_multiple_tools_in_parallel_concurrently_then_answer(Executor executor) {
+
+        // given
+        class Tools {
+
+            static final String CURRENT_TIME = "16:28";
+            static final String CURRENT_TEMPERATURE = "17";
+
+            final Queue<Thread> getCurrentTimeThreads = new ConcurrentLinkedQueue<>();
+            final Queue<Thread> getCurrentTemperatureThreads = new ConcurrentLinkedQueue<>();
+
+            @Tool
+            String getCurrentTime(String city) {
+                getCurrentTimeThreads.add(Thread.currentThread());
+                return CURRENT_TIME;
+            }
+
+            @Tool
+            String getCurrentTemperature(String city) {
+                getCurrentTemperatureThreads.add(Thread.currentThread());
+                return CURRENT_TEMPERATURE;
+            }
+        }
+
+        Tools spyTools = spy(new Tools());
+
+        ChatMemory chatMemory = MessageWindowChatMemory.withMaxMessages(10);
+
+        Assistant assistant = AiServices.builder(Assistant.class)
+                .chatModel(models().findFirst().get())
+                .chatMemory(chatMemory)
+                .tools(spyTools)
+                .executeToolsConcurrently(executor)
+                .build();
+
+        String userMessage = "What is the current time and temperature in Munich?";
+
+        // when
+        Result<String> result = assistant.chat(userMessage);
+
+        // then
+        assertThat(result.content()).contains(Tools.CURRENT_TIME, Tools.CURRENT_TEMPERATURE);
+
+        verify(spyTools).getCurrentTime("Munich");
+        verify(spyTools).getCurrentTemperature("Munich");
+        verifyNoMoreInteractions(spyTools);
+
+        assertThat(spyTools.getCurrentTimeThreads).hasSize(1);
+        Thread getCurrentTimeThread = spyTools.getCurrentTimeThreads.poll();
+        assertThat(getCurrentTimeThread).isNotEqualTo(Thread.currentThread());
+
+        assertThat(spyTools.getCurrentTemperatureThreads).hasSize(1);
+        Thread getCurrentTemperatureThread = spyTools.getCurrentTemperatureThreads.poll();
+        assertThat(getCurrentTemperatureThread).isNotEqualTo(Thread.currentThread());
+
+        assertThat(getCurrentTimeThread).isNotEqualTo(getCurrentTemperatureThread);
+    }
+
+    static List<Executor> executors() {
+        return List.of(Executors.newFixedThreadPool(2));
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @MethodSource("executors")
+    void should_execute_single_tool_in_the_same_thread(Executor executor) {
+
+        // given
+        class Tools {
+
+            static final String CURRENT_TEMPERATURE = "17";
+
+            final Queue<Thread> getCurrentTemperatureThreads = new ConcurrentLinkedQueue<>();
+
+            @Tool
+            String getCurrentTemperature(String city) {
+                getCurrentTemperatureThreads.add(Thread.currentThread());
+                return CURRENT_TEMPERATURE;
+            }
+        }
+
+        Tools spyTools = spy(new Tools());
+
+        ChatMemory chatMemory = MessageWindowChatMemory.withMaxMessages(10);
+
+        Assistant assistant = AiServices.builder(Assistant.class)
+                .chatModel(models().findFirst().get())
+                .chatMemory(chatMemory)
+                .tools(spyTools)
+                .executeToolsConcurrently(executor)
+                .build();
+
+        String userMessage = "What is the current temperature in Munich?";
+
+        // when
+        Result<String> result = assistant.chat(userMessage);
+
+        // then
+        assertThat(result.content()).contains(Tools.CURRENT_TEMPERATURE);
+
+        verify(spyTools).getCurrentTemperature("Munich");
+        verifyNoMoreInteractions(spyTools);
+
+        assertThat(spyTools.getCurrentTemperatureThreads).hasSize(1);
+        assertThat(spyTools.getCurrentTemperatureThreads.poll()).isEqualTo(Thread.currentThread());
     }
 
     static class IntegerListProcessor {
@@ -861,5 +1006,83 @@ class AiServicesWithToolsIT {
 
         verify(tools).currentDate();
         verifyNoMoreInteractions(tools);
+    }
+
+
+    interface RouterAgent {
+
+        @dev.langchain4j.service.UserMessage("""
+            Analyze the following user request and categorize it as 'legal', 'medical' or 'technical',
+            then forward the request as it is to the corresponding expert provided as a tool.
+            Finally return the answer that you received from the expert without any modification.
+
+            The user request is: '{{it}}'.
+            """)
+        String askToExpert(String request);
+    }
+
+    interface MedicalExpert {
+
+        @dev.langchain4j.service.UserMessage("""
+            You are a medical expert.
+            Analyze the following user request under a medical point of view and provide the best possible answer.
+            The user request is {{it}}.
+            """)
+        @Tool("A medical expert")
+        String medicalRequest(String request);
+    }
+
+    interface LegalExpert {
+
+        @dev.langchain4j.service.UserMessage("""
+            You are a legal expert.
+            Analyze the following user request under a legal point of view and provide the best possible answer.
+            The user request is {{it}}.
+            """)
+        @Tool("A legal expert")
+        String legalRequest(String request);
+    }
+
+    interface TechnicalExpert {
+
+        @dev.langchain4j.service.UserMessage("""
+            You are a technical expert.
+            Analyze the following user request under a technical point of view and provide the best possible answer.
+            The user request is {{it}}.
+            """)
+        @Tool("A technical expert")
+        String technicalRequest(String request);
+    }
+
+    @ParameterizedTest
+    @MethodSource("models")
+    void tools_as_agents_tests(ChatModel model) {
+        MedicalExpert medicalExpert = spy(AiServices.builder(MedicalExpert.class)
+                .chatModel(model)
+                .build());
+        LegalExpert legalExpert = spy(AiServices.builder(LegalExpert.class)
+                .chatModel(model)
+                .build());
+        TechnicalExpert technicalExpert = spy(AiServices.builder(TechnicalExpert.class)
+                .chatModel(model)
+                .build());
+
+        ChatMemory chatMemory = MessageWindowChatMemory.withMaxMessages(10);
+        RouterAgent routerAgent = AiServices.builder(RouterAgent.class)
+                .chatModel(model)
+                .chatMemory(chatMemory)
+                .tools(medicalExpert, legalExpert, technicalExpert)
+                .build();
+
+        routerAgent.askToExpert("I broke my leg what should I do");
+        verify(medicalExpert).medicalRequest("I broke my leg what should I do");
+        verifyNoInteractions(legalExpert, technicalExpert);
+
+        List<ChatMessage> messages = chatMemory.messages();
+        assertThat(messages).hasSize(4);
+        assertThat(messages.get(0)).isInstanceOf(UserMessage.class); // user prompt
+        assertThat(messages.get(1)).isInstanceOf(AiMessage.class); // ai message to invoke the tool
+        assertThat(messages.get(2)).isInstanceOf(ToolExecutionResultMessage.class); // tool response
+        assertThat(messages.get(3)).isInstanceOf(AiMessage.class); // final ai message
     }
 }

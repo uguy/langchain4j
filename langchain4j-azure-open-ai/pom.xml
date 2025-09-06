@@ -5,12 +5,22 @@
     <parent>
         <groupId>dev.langchain4j</groupId>
         <artifactId>langchain4j-parent</artifactId>
-        <version>1.1.0-beta7-SNAPSHOT</version>
+        <version>1.5.0-beta11-SNAPSHOT</version>
         <relativePath>../langchain4j-parent/pom.xml</relativePath>
     </parent>
 
     <artifactId>langchain4j-azure-open-ai</artifactId>
+    <version>1.5.0-SNAPSHOT</version>
     <name>LangChain4j :: Integration :: Azure OpenAI</name>
+
+    <developers>
+        <developer>
+            <id>jdubois</id>
+            <name>Julien Dubois</name>
+            <email>github@julien-dubois.com</email>
+            <url>https://www.julien-dubois.com</url>
+        </developer>
+    </developers>
 
     <dependencyManagement>
         <dependencies>
@@ -29,7 +39,7 @@
         <dependency>
             <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j-core</artifactId>
-            <version>1.1.0-SNAPSHOT</version>
+            <version>1.5.0-SNAPSHOT</version>
         </dependency>
 
         <dependency>
@@ -39,15 +49,15 @@
         </dependency>
 
         <dependency>
-            <groupId>com.knuddels</groupId>
-            <artifactId>jtokkit</artifactId>
-            <version>${jtokkit.version}</version>
-        </dependency>
-
-        <dependency>
             <groupId>com.azure</groupId>
             <artifactId>azure-identity</artifactId>
             <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>com.knuddels</groupId>
+            <artifactId>jtokkit</artifactId>
+            <version>${jtokkit.version}</version>
         </dependency>
 
         <dependency>
@@ -60,18 +70,19 @@
             <artifactId>jackson-databind</artifactId>
         </dependency>
 
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-api</artifactId>
-        </dependency>
-
-
         <!-- test dependencies -->
+
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+            <version>2.19.0</version>
+            <scope>test</scope>
+        </dependency>
 
         <dependency>
             <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j-core</artifactId>
-            <version>1.1.0-SNAPSHOT</version>
+            <version>1.5.0-SNAPSHOT</version>
             <classifier>tests</classifier>
             <type>test-jar</type>
             <scope>test</scope>
@@ -80,14 +91,14 @@
         <dependency>
             <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j</artifactId>
-            <version>1.1.0-SNAPSHOT</version>
+            <version>1.5.0-SNAPSHOT</version>
             <scope>test</scope>
         </dependency>
 
         <dependency>
             <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j</artifactId>
-            <version>1.1.0-SNAPSHOT</version>
+            <version>1.5.0-SNAPSHOT</version>
             <classifier>tests</classifier>
             <type>test-jar</type>
             <scope>test</scope>
@@ -108,12 +119,6 @@
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-slf4j2-impl</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-engine</artifactId>
             <scope>test</scope>
         </dependency>
 
